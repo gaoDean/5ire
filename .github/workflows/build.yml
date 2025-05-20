@@ -28,16 +28,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
+          
       - name: Install Python distutils and other dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install setuptools wheel
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+        
+      - name: Install app dependencies
+        run: |
+          cd release/app
+          npm install
+          cd ../..
 
-      - name: Set dummy environment variables
+      - name: Set environment variables
         run: |
           echo "SUPA_PROJECT_ID=dummy_id" >> $GITHUB_ENV
           echo "SUPA_KEY=dummy_key" >> $GITHUB_ENV
@@ -46,80 +52,32 @@ jobs:
           echo "NODE_ENV=production" >> $GITHUB_ENV
         shell: bash
 
-      - name: Install electron-builder dependencies
-        run: npm install -g electron-builder@24.13.3
-
       - name: Platform-specific setup
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # Create tmp directory for electron-builder
-            mkdir -p ./tmp
-            # Specific macOS setup
             echo "Setting up for macOS build"
-            # Avoid symlink issues on macOS
-            echo "Configuring to avoid symlink issues"
-            git config --global core.symlinks false
           elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            # Specific Linux setup
             echo "Setting up for Linux build"
             sudo apt-get update
             sudo apt-get install -y libpng-dev libxext-dev libx11-dev libxcb1-dev
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            # Specific Windows setup
             echo "Setting up for Windows build"
           fi
         shell: bash
 
-      - name: Debug environment
-        run: |
-          python --version
-          node --version
-          npm --version
-          echo "Which python: $(which python)"
-          echo "Python packages:"
-          pip list
-
       - name: Clean build directories
         run: |
-          rm -rf release/build
-          rm -rf release/app/node_modules
           rm -rf dist
+          rm -rf release/build
         shell: bash
 
-      - name: Run package command with retry
+      - name: Build application (compile)
+        run: npm run build
+        
+      - name: Package application
         run: |
-          # Try packaging up to 3 times
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS"
-            
-            # Clean any previous build artifacts first
-            if [ $ATTEMPT -gt 1 ]; then
-              echo "Cleaning up from previous attempt..."
-              rm -rf release/build
-              rm -rf release/app/node_modules
-            fi
-            
-            # Run the package command
-            if npm run package; then
-              echo "Build succeeded on attempt $ATTEMPT"
-              break
-            else
-              if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-                echo "All $MAX_ATTEMPTS attempts failed. Giving up."
-                exit 1
-              else
-                echo "Attempt $ATTEMPT failed. Retrying..."
-                ATTEMPT=$((ATTEMPT+1))
-              fi
-            fi
-          done
-        shell: bash
-        env:
-          ELECTRON_BUILDER_ALLOW_MISSING_DEPS: true
-
+          npx electron-builder build --publish never --${{ matrix.os == 'macos-latest' && 'mac' || matrix.os == 'windows-latest' && 'win' || 'linux' }}
+        
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
