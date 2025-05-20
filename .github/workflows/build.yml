@@ -122,12 +122,19 @@ jobs:
             cd release/app
             # Remove the module and reinstall with specific build flags for macOS
             rm -rf node_modules/electron-deeplink
+            
+            # Install with specific flags
             CXXFLAGS="-stdlib=libc++" LDFLAGS="-stdlib=libc++" npm install electron-deeplink@1.0.10 --no-save
-            cd ../..
-            # Apply patch to fix binding.gyp
-            node .github/scripts/electron-deeplink-patch.js
+            
+            # Manually patch the binding.gyp file
+            if [ -f "node_modules/electron-deeplink/binding.gyp" ]; then
+              echo "Patching electron-deeplink binding.gyp for macOS"
+              # Use sed to add xcode_settings to the target
+              sed -i '' 's/"target_name": "electron-deeplink"/"target_name": "electron-deeplink", "xcode_settings": {"MACOSX_DEPLOYMENT_TARGET": "10.15", "OTHER_CFLAGS": ["-std=c++17", "-stdlib=libc++"], "OTHER_LDFLAGS": ["-stdlib=libc++"]}/' node_modules/electron-deeplink/binding.gyp
+              cat node_modules/electron-deeplink/binding.gyp
+            fi
+            
             # Rebuild with correct flags
-            cd release/app
             npm rebuild electron-deeplink --update-binary
             cd ../..
           fi
