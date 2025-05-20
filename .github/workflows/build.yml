@@ -52,15 +52,13 @@ jobs:
             echo "CC=gcc-12" >> $GITHUB_ENV
             echo "CXX=g++-12" >> $GITHUB_ENV
           fi
-        shell: bash
-
-      - name: Install native dependencies with prebuild-install
+        shell: bash      - name: Install native dependencies with prebuild-install
         run: |
           cd release/app
           # Install better-sqlite3 from prebuilt binaries if possible
           npm install better-sqlite3@11.1.1 --build-from-source=false --no-save
           cd ../..
-
+        
       - name: Set environment variables
         run: |
           echo "SUPA_PROJECT_ID=dummy_id" >> $GITHUB_ENV
@@ -71,6 +69,13 @@ jobs:
           # Skip native module rebuilding during package step
           echo "ELECTRON_SKIP_BINARY_DOWNLOAD=1" >> $GITHUB_ENV
           echo "npm_config_build_from_source=false" >> $GITHUB_ENV
+          
+          # Add special environment variables for macOS native module builds
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            echo "CXXFLAGS=-stdlib=libc++" >> $GITHUB_ENV
+            echo "LDFLAGS=-stdlib=libc++" >> $GITHUB_ENV
+            echo "MACOSX_DEPLOYMENT_TARGET=10.15" >> $GITHUB_ENV
+          fi
         shell: bash
 
       - name: Platform-specific setup
@@ -109,6 +114,24 @@ jobs:
             ls -la release/app/dist || echo "release/app/dist directory not found"
           fi
         shell: bash
+        
+      - name: Handle electron-deeplink dependency
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            echo "Setting up electron-deeplink on macOS"
+            cd release/app
+            # Remove the module and reinstall with specific build flags for macOS
+            rm -rf node_modules/electron-deeplink
+            CXXFLAGS="-stdlib=libc++" LDFLAGS="-stdlib=libc++" npm install electron-deeplink@1.0.10 --no-save
+            cd ../..
+            # Apply patch to fix binding.gyp
+            node .github/scripts/electron-deeplink-patch.js
+            # Rebuild with correct flags
+            cd release/app
+            npm rebuild electron-deeplink --update-binary
+            cd ../..
+          fi
+        shell: bash
 
       - name: Run package script
         run: npm run package -- --publish never
@@ -118,6 +141,10 @@ jobs:
           USE_HARD_LINKS: false
           ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+          # Skip rebuilding native modules that we've already built
+          npm_config_ignore_scripts: true
+          # Additional flags for debugging
+          DEBUG: electron-builder
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
