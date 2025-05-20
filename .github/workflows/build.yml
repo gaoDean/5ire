@@ -90,34 +90,28 @@ jobs:
         run: |
           rm -rf dist
           rm -rf release/build
-          mkdir -p dist
+          rm -rf release/app/dist
         shell: bash
 
-      - name: Build application (compile)
+      - name: Build application
         run: npm run build
         
-      - name: Debug dist directory
+      - name: Debug directories after build
         run: |
-          echo "Contents of project root:"
-          ls -la
-          echo "Contents of dist directory (if exists):"
+          echo "Contents of dist directory:"
           ls -la dist || echo "dist directory not found"
+          echo "Ensuring release/app/dist exists:"
+          mkdir -p release/app/dist
+          # Copy the built files to the release app directory
+          if [ -d "dist" ]; then
+            cp -r dist/* release/app/dist/ || echo "Failed to copy dist files"
+            echo "Contents after copy:"
+            ls -la release/app/dist || echo "release/app/dist directory not found"
+          fi
+        shell: bash
         
-      - name: Run complete package script
-        run: |
-          # Use the package script which handles both building and packaging
-          npm run package -- --publish never
-        env:
-          ELECTRON_BUILDER_ALLOW_MISSING_DEPS: true
-          npm_config_build_from_source: false
-          USE_HARD_LINKS: false
-          ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
-          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
-        
-      - name: Run complete package script
-        run: |
-          # Use the package script which handles both building and packaging
-          npm run package -- --publish never
+      - name: Run package script
+        run: npm run package -- --publish never
         env:
           ELECTRON_BUILDER_ALLOW_MISSING_DEPS: true
           npm_config_build_from_source: false
