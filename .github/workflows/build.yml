@@ -28,7 +28,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          
+
       - name: Install Python distutils and other dependencies
         run: |
           python -m pip install --upgrade pip
@@ -36,7 +36,7 @@ jobs:
 
       - name: Install dependencies
         run: npm install
-        
+
       - name: Setup C++ compiler if needed
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
@@ -60,7 +60,7 @@ jobs:
           # Install better-sqlite3 from prebuilt binaries if possible
           npm install better-sqlite3@11.1.1 --build-from-source=false --no-save
           cd ../..
-        
+
       - name: Set environment variables
         run: |
           echo "SUPA_PROJECT_ID=dummy_id" >> $GITHUB_ENV
@@ -95,7 +95,7 @@ jobs:
 
       - name: Build application
         run: npm run build
-        
+
       - name: Debug directories after build
         run: |
           echo "Contents of dist directory:"
@@ -109,7 +109,7 @@ jobs:
             ls -la release/app/dist || echo "release/app/dist directory not found"
           fi
         shell: bash
-        
+
       - name: Run package script
         run: npm run package -- --publish never
         env:
@@ -118,7 +118,7 @@ jobs:
           USE_HARD_LINKS: false
           ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
-        
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
