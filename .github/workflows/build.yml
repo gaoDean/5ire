@@ -95,6 +95,18 @@ jobs:
       - name: Build application (compile)
         run: npm run build
         
+      - name: Copy files to release/app for packaging
+        run: |
+          # Make sure dist directory exists in release/app
+          mkdir -p release/app/dist
+          
+          # Copy dist files from project root to release/app
+          cp -r dist/* release/app/dist/
+          
+          # Log the contents to verify
+          echo "Contents of release/app/dist directory:"
+          ls -la release/app/dist
+        
       - name: Create electron-builder config
         run: |
           cat > electron-builder.config.js << 'EOF'
@@ -102,12 +114,13 @@ jobs:
             appId: "org.nanbingxyz.5ire",
             productName: "5ire",
             files: [
-              "dist",
-              "node_modules",
+              "dist/**/*",
+              "node_modules/**/*",
               "package.json"
             ],
             directories: {
               output: "release/build",
+              app: "release/app",
               buildResources: "assets"
             },
             extraResources: [
@@ -128,6 +141,13 @@ jobs:
         
       - name: Package application
         run: |
+          # Show directory structure for debugging
+          echo "Project structure before packaging:"
+          find . -type d -name "dist" | xargs ls -la
+          echo "release/app package.json:"
+          cat release/app/package.json
+          
+          # Run electron-builder
           npx electron-builder build --config=electron-builder.config.js --publish never --${{ matrix.os == 'macos-latest' && 'mac' || matrix.os == 'windows-latest' && 'win' || 'linux' }}
         env:
           ELECTRON_BUILDER_ALLOW_MISSING_DEPS: true
