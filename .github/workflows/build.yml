@@ -49,6 +49,24 @@ jobs:
       - name: Install electron-builder dependencies
         run: npm install -g electron-builder@24.13.3
         
+      - name: Platform-specific setup
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # Create tmp directory for electron-builder
+            mkdir -p ./tmp
+            # Specific macOS setup
+            echo "Setting up for macOS build"
+          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            # Specific Linux setup
+            echo "Setting up for Linux build"
+            sudo apt-get update
+            sudo apt-get install -y libpng-dev libxext-dev libx11-dev libxcb1-dev
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            # Specific Windows setup
+            echo "Setting up for Windows build"
+          fi
+        shell: bash
+        
       - name: Debug environment
         run: |
           python --version
@@ -58,14 +76,40 @@ jobs:
           echo "Python packages:"
           pip list
 
+      - name: Clean build directories
+        run: |
+          rm -rf release/build
+          rm -rf release/app/node_modules
+          rm -rf dist
+        shell: bash
+
       - name: Build application
         run: npm run package
         env:
           ELECTRON_BUILDER_ALLOW_MISSING_DEPS: true
+          ELECTRON_BUILDER_MAX_CONCURRENT_DOWNLOADS: 4
+          ELECTRON_BUILDER_TMP_DIR: "./tmp"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: build-${{ matrix.os }}
-          path: release/build
+          path: |
+            release/build
+            ./tmp
           retention-days: 7
+          if-no-files-found: warn
+          
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: logs-${{ matrix.os }}
+          path: |
+            ./npm-debug.log
+            ./*.log
+            ./tmp/**/*.log
+            ./release/build/**/*.log
+          retention-days: 3
+          if-no-files-found: ignore
